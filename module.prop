@@ -1,6 +1,6 @@
 id=Msg_2_Bark
 name=Msg2Bark
-version=20250407
-versionCode=20250407
-author=Kevin
-description=未读短信自动转发至Bark,开源仓库https://github.com/HKL-Kevin/Msg2Bark
+version=20260406
+versionCode=20260406
+author=9527xiao9527
+description=短信/来电转发模块，支持企业微信/Bark/WxPusher，开源仓库https://github.com/9527xiao9527/Msg2Bark
