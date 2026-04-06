@@ -127,17 +127,21 @@ forwarding(){
 
     # 优化：移除 bc 依赖，使用 shell 算术运算
     # 注意：sqlite3 的 DATETIME 处理可能需要根据具体 Android 版本调整，这里保留原逻辑但修复 bc
-    sqlite3 -separator $'\t' "$MSG_DB_PATH" "SELECT _id, address, strftime('%Y-%m-%d %H:%M:%S', date/1000, 'unixepoch', 'localtime'), body, sub_id FROM sms WHERE type = 1 AND read = 0 AND datetime(date/1000, 'unixepoch', 'localtime') > '$startTime' LIMIT 1;" | while IFS=$'\t' read -r sms_id address formatted_date body sub_id; do
+    sqlite3 -separator $'\t' "$MSG_DB_PATH" "SELECT _id, address, strftime('%Y-%m-%d %H:%M:%S', date/1000, 'unixepoch', 'localtime'), body, sim_id FROM sms WHERE type = 1 AND read = 0 AND datetime(date/1000, 'unixepoch', 'localtime') > '$startTime' LIMIT 1;" | while IFS=$'\t' read -r sms_id address formatted_date body sim_id; do
         if [ -z "$sms_id" ]; then continue; fi
 
-        local sim1_name=$(get_config "sim1_name" "SIM1")
-        local sim2_name=$(get_config "sim2_name" "SIM2")
+        local sim1_name=$(get_config "sim1_name" "")
+        local sim2_name=$(get_config "sim2_name" "")
+        local sim1_simid=$(get_config "sim1_simid" "")
+        local sim2_simid=$(get_config "sim2_simid" "")
         local sim_slot
-        case "$sub_id" in
-            1) sim_slot="$sim1_name" ;;
-            2) sim_slot="$sim2_name" ;;
-            *) sim_slot="SIM(sub_id=$sub_id)" ;;
-        esac
+        if [ -n "$sim1_simid" ] && [ "$sim_id" = "$sim1_simid" ]; then
+            sim_slot="${sim1_name:-SIM1(simid=$sim_id)}"
+        elif [ -n "$sim2_simid" ] && [ "$sim_id" = "$sim2_simid" ]; then
+            sim_slot="${sim2_name:-SIM2(simid=$sim_id)}"
+        else
+            sim_slot="SIM(simid=$sim_id)"
+        fi
 
         local bark_switch=$(get_config "bark_switch" "0")
         local wx_switch=$(get_config "wx_switch" "0")
@@ -178,22 +182,20 @@ callReport(){
         return 0
     fi
 
-    sqlite3 -separator $'\t' "$CALL_DB_PATH" "SELECT _id, number, strftime('%Y-%m-%d %H:%M:%S', date/1000, 'unixepoch', 'localtime'), new, subscription_id FROM calls WHERE type = 3 AND new = 1 AND datetime(date/1000, 'unixepoch', 'localtime') > '$startTime' LIMIT 1;" | while IFS=$'\t' read -r call_id number formatted_date is_new subscription_id; do
+    sqlite3 -separator $'\t' "$CALL_DB_PATH" "SELECT _id, number, strftime('%Y-%m-%d %H:%M:%S', date/1000, 'unixepoch', 'localtime'), new, simid FROM calls WHERE type = 3 AND new = 1 AND datetime(date/1000, 'unixepoch', 'localtime') > '$startTime' LIMIT 1;" | while IFS=$'\t' read -r call_id number formatted_date is_new simid; do
         if [ -z "$call_id" ]; then continue; fi
 
-        local sim1_name=$(get_config "sim1_name" "SIM1")
-        local sim2_name=$(get_config "sim2_name" "SIM2")
-        local sim1_imei=$(get_config "sim1_imei" "")
-        local sim2_imei=$(get_config "sim2_imei" "")
-        # subscription_id 通常包含 IMEI，取后四位匹配
-        local sub_tail=$(echo "$subscription_id" | grep -o '.\{4\}$')
+        local sim1_name=$(get_config "sim1_name" "")
+        local sim2_name=$(get_config "sim2_name" "")
+        local sim1_simid=$(get_config "sim1_simid" "")
+        local sim2_simid=$(get_config "sim2_simid" "")
         local sim_slot
-        if [ -n "$sim1_imei" ] && [ "$sub_tail" = "$sim1_imei" ]; then
-            sim_slot="$sim1_name"
-        elif [ -n "$sim2_imei" ] && [ "$sub_tail" = "$sim2_imei" ]; then
-            sim_slot="$sim2_name"
+        if [ -n "$sim1_simid" ] && [ "$simid" = "$sim1_simid" ]; then
+            sim_slot="${sim1_name:-SIM1(simid=$simid)}"
+        elif [ -n "$sim2_simid" ] && [ "$simid" = "$sim2_simid" ]; then
+            sim_slot="${sim2_name:-SIM2(simid=$simid)}"
         else
-            sim_slot="SIM($sub_tail)"
+            sim_slot="SIM(simid=$simid)"
         fi
 
         local bark_switch=$(get_config "bark_switch" "0")
